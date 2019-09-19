@@ -26,9 +26,19 @@ RUN cd /var/www/html/modules \
     && tar xzf civicrm-l10n.tar.gz \
     && rm civicrm-l10n.tar.gz
 
+#Custom Module download
+RUN cd /var/www/html/modules \
+  && for i in $(cat ./contrib_modules_download.txt); do drush dl $i; done
+
+# CiviCRM extensions
+RUN cd /var/www/html/ \
+    &&  mkdir ext \
+    && cd ext \
+    && for i in $(cat /var/www/civicrm_extension_download.txt); do cv dl $i; done 
+
 USER root
 
-COPY ./civicrm-docker-entrypoint ./civicrm-docker-init ./civicrm-docker-dump ./civicrm-docker-install /usr/local/bin/
+COPY --chown=civicrm:civicrm ./civicrm-docker-entrypoint ./civicrm-docker-init ./civicrm-docker-dump ./civicrm-docker-install /usr/local/bin/
 
 RUN mkdir -p /var/www/config/active \
     && mkdir -p /var/www/config/staging \

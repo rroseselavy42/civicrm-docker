@@ -5,11 +5,27 @@ CONTAINER_IP=`/sbin/ip route|awk '/default/ { print $3 }'`
 echo $CONTAINER_IP $DOMAIN >> /etc/hosts
 
 # sendmail via smtp
+if [ -z "${SMTP_HOST}" ]; then
 cat << EOF > /etc/msmtprc
 host $SMTP_HOST
 auto_from on
 maildomain $SMTP_MAILDOMAIN
 EOF
+else
+    cat << EOF > /etc/msmtprc
+    defaults
+    auth           on
+    tls            on
+    tls_trust_file /etc/ssl/certs/ca-certificates.crt
+    account default
+    tls_starttls $SMTP_STARTTLS
+    host $SMTP_HOST
+    port $SMTP_PORT
+    from $SMTP_FROM
+    user $SMTP_USER
+    password $SMTP_PASS
+    EOF
+fi
 
 # civicrm php.ini settings
 cat << EOF > /usr/local/etc/php/conf.d/civicrm.ini
@@ -21,6 +37,21 @@ max_input_time  = -1
 sendmail_path=/usr/sbin/sendmail -t -i
 date.timezone=$PHP_DATE_TIMEZONE
 EOF
+
+while ! mysqladmin ping -h"$CIVICRM_DB_HOST" --silent; do
+        sleep 1
+    done
+
+
+for FILE in settings.php civicrm.settings.php; do
+    cp /usr/local/etc/civicrm/$FILE .
+    chmod a-wx $FILE
+        done
+
+BACKDROP_VERSION_INSTALLED=
+CIVICRM_VERSION_INSTALLED=
+
+
 
 if [ "$DEBUG" = "ON" ]; then
 	cp /usr/local/etc/php/php.ini-development /usr/local/etc/php/php.ini
@@ -40,8 +71,13 @@ max_execution_time=600
 EOF
 fi
 
+
+{% if variant == 'apache' %}
+{% raw %}
 # first arg is `-f` or `--some-option`
 if [ "${1#-}" != "$1" ]; then
 	set -- apache2-foreground "$@"
 fi
+{% endraw %}
+{% endif %}
 exec "$@"

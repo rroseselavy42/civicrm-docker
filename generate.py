@@ -14,26 +14,27 @@ latest_civicrm_release = os.popen(
 civi_releases = [latest_civicrm_release]
 cms_variants = ["drupal", "wordpress", "backdrop"]
 php_releases = ["7.3", "7.2", "7.1", "7.0", "5.6"]
-defaults = {"civi": latest_civicrm_release, "cms": "drupal", "php": "7.2"}
+image_variants = ["apache", "fpm"]
+defaults = {"civi": latest_civicrm_release, "cms": "drupal", "php": "7.2", "variant": "apache"}
 
 # Generate combinations
 combos = {}
-for civi, cms, php in itertools.product(civi_releases, cms_variants, php_releases):
+for civi, cms, php, variant in itertools.product(civi_releases, cms_variants, php_releases, image_variants):
     major = civi.split(".")[0]
-    key = f"{civi}/{cms}/{php}"
+    key = f"{civi}/{cms}/{php}/{variant}"
     combos[key] = {
         "tags": [],
-        "variables": {"civi": civi, "cms": cms, "php": php},
-        "dir": f"{major}/{cms}/php{php}",
+        "variables": {"civi": civi, "cms": cms, "php": php, "variant": variant},
+        "dir": f"{major}/{cms}/php{php}/{variant}",
     }
 
 
 # Generate tags
 tags = []
-for civi, cms, php in itertools.product(
-    civi_releases + [False], cms_variants + [False], php_releases + [False]
+for civi, cms, php, variant in itertools.product(
+    civi_releases + [False], cms_variants + [False], php_releases + [False], image_variants + [False]
 ):
-    tags.append({"civi": civi, "cms": cms, "php": php})
+    tags.append({"civi": civi, "cms": cms, "php": php, "variant": variant})
 
 # Attach tags to combinations
 for tag in tags:
@@ -50,6 +51,8 @@ for tag in tags:
         tag_combos.append([tag["cms"]])
     if tag["php"]:
         tag_combos.append(["php" + tag["php"]])
+    if tag["variant"]:
+        tag_combos.append(["variant" + tag["variant"]])
 
     # Subsitiute
     key_parts = []
@@ -81,7 +84,9 @@ for combo in combos.values():
     # Dockerfile
     docker_file = templates.get_template("Dockerfile")
     docker_file.stream(**combo["variables"]).dump(f"{combo_dir}/Dockerfile")
-
+    #Entrypoint
+    entrypoint_file = templates.get_template("civicrm-docker-entrypoint")
+    entrypoint_file.stream(**combo["variables"]).dump(f"{combo_dir}/civicrm-docker-entrypoint")
     # civicrm.settings.php
     run(
         [
@@ -142,7 +147,6 @@ for combo in combos.values():
             "cp",
             "templates/apache.conf",
             "templates/civicrm_dump.php",
-            "templates/civicrm-docker-entrypoint",
             combo_dir,
         ]
     )
